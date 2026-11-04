@@ -1,0 +1,12 @@
+{
+  "name": "queincreible/tienda",
+  "description": "Tienda online de Que Increible Compañia SL (empresa ficticia de demo)",
+  "type": "project",
+  "require": {
+    "php": ">=8.2",
+    "firebase/php-jwt": "^6.10",
+    "ext-openssl": "*",
+    "ext-sodium": "*"
+  },
+  "autoload": { "psr-4": { "QueIncreible\\Tienda\\": "src/" } }
+}
