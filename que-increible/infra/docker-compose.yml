@@ -1,0 +1,17 @@
+# Entorno de la tienda en local (demo). Las credenciales son FICTICIAS y están
+# en claro a propósito: |QS>EDR debe señalarlas.
+services:
+  tienda-php:
+    image: tienda-php:local
+    environment:
+      ENCRYPTION_KEY: "VGllbmRhUXVlSW5jcmVpYmxlRGVtbzEyMzQ="
+      JWT_SECRET: "tienda-que-increible-demo-NO-REAL"
+      DB_PASSWORD: "demo-no-real"
+  proxy:
+    build: .
+    ports:
+      - "443:443"
+  base:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: "demo-no-real"
