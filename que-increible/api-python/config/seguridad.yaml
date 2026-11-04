@@ -1,0 +1,10 @@
+# Configuración criptográfica de la API de pedidos (demo).
+# El algoritmo de los tokens y el del canal con el almacén se leen de aquí,
+# no del código: cambiarlos no exige publicar una versión.
+tokens:
+  algoritmo: ES256
+  caducidad_minutos: 30
+almacen:
+  # Piloto post-cuántico con el almacén logístico (liboqs).
+  kem: ML-KEM-768
+  firma: ML-DSA-65
