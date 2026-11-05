@@ -11,9 +11,18 @@ fn des_de_juguete() {
 }
 
 #[test]
-fn rc4_del_simulador() {
-    use rc4::{KeyInit as _, StreamCipher};
-    let mut c = rc4::Rc4::new_from_slice(b"clave-de-prueba").unwrap();
-    let mut datos = *b"hola";
-    c.apply_keystream(&mut datos);
+fn aes_gcm_del_simulador() {
+    use aes_gcm::{
+        aead::{Aead, AeadCore, KeyInit, OsRng},
+        Aes256Gcm,
+    };
+    // Clave de 256 bits generada aleatoriamente (nunca hardcodeada)
+    let clave = Aes256Gcm::generate_key(OsRng);
+    let c = Aes256Gcm::new(&clave);
+    // Nonce de 96 bits único por operación de cifrado
+    let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+    let datos = b"hola";
+    let cifrado = c.encrypt(&nonce, datos.as_ref()).unwrap();
+    let descifrado = c.decrypt(&nonce, cifrado.as_ref()).unwrap();
+    assert_eq!(&descifrado, datos);
 }
