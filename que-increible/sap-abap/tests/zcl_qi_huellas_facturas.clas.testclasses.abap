@@ -5,11 +5,11 @@ CLASS ltc_huellas DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHOR
 ENDCLASS.
 
 CLASS ltc_huellas IMPLEMENTATION.
-  METHOD hmac_md5_fixture.
+  METHOD hmac_sha256_fixture.
     DATA lv_huella TYPE string.
     CALL FUNCTION 'CALCULATE_HMAC_FOR_RAW'
       EXPORTING
-        alg  = 'MD5'
+        alg  = 'SHA256'
         data = 'fixture'
       IMPORTING
         hmacstring = lv_huella.
