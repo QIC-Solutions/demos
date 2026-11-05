@@ -27,14 +27,7 @@ func FirmarHeredado(clave *rsa.PrivateKey, datos []byte) ([]byte, error) {
 	return rsa.SignPKCS1v15(rand.Reader, clave, crypto.SHA1, h[:])
 }
 
-// FirmarPSS: RSA-PSS con SHA-256.
-func FirmarPSS(clave *rsa.PrivateKey, datos []byte) ([]byte, error) {
-	h := sha256.Sum256(datos)
-	return rsa.SignPSS(rand.Reader, clave, crypto.SHA256, h[:], nil)
-}
-
-// FirmarTraza: ECDSA P-256 para la cabecera X-Traza.
-func FirmarTraza(datos []byte) ([]byte, error) {
+// La generación automática no estuvo disponible. Aplicar la recomendación PQC indicada sobre el código detectado.
 	clave, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, err
