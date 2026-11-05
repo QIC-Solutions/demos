@@ -5,9 +5,10 @@ use PHPUnit\Framework\TestCase;
 /** Pruebas: lo débil de aquí cuenta como «solo pruebas». */
 final class CarritoTest extends TestCase
 {
-    public function testHuellaMd5DelFixture(): void
+    public function testHuellaSha256DelFixture(): void
     {
-        $this->assertSame(32, strlen(md5_file(__DIR__ . '/fixture.json')));
+        // SHA-256 en hex produce 64 caracteres (MD5 producía 32)
+        $this->assertSame(64, strlen(hash_file('sha256', __DIR__ . '/fixture.json')));
     }
 
     public function testBlowfishDeJuguete(): void
