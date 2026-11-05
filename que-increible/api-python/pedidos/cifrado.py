@@ -25,9 +25,18 @@ def cifrar_telefono(telefono: str) -> bytes:
     return nonce + AESGCM(clave).encrypt(nonce, telefono.encode(), None)
 
 
+import os
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+
 def exportar_al_erp(registro: bytes, clave_erp: bytes) -> bytes:
-    """El ERP de 2009 solo descifra Triple DES."""
-    return DES3.new(clave_erp, DES3.MODE_CBC, iv=b"\x00" * 8).encrypt(registro.ljust(64, b" "))
+    """Exportación al ERP con AES-256-GCM (3DES retirado por NIST).
+    El ERP debe actualizarse o recibir el registro a través de un adaptador
+    que soporte AES-256-GCM. Devuelve nonce (12 bytes) || texto cifrado + tag."""
+    if len(clave_erp) != 32:
+        raise ValueError("clave_erp debe ser de 256 bits (32 bytes)")
+    nonce = os.urandom(12)
+    return nonce + AESGCM(clave_erp).encrypt(nonce, registro, associated_data=b"erp-export")
 
 
 def cifrar_cupon(cupon: bytes, clave: bytes) -> bytes:
