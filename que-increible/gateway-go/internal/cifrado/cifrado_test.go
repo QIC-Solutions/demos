@@ -7,13 +7,17 @@ import (
 	"testing"
 )
 
-// Pruebas: lo débil de aquí cuenta como «solo pruebas».
-func TestDesDeJuguete(t *testing.T) {
-	if _, err := des.NewCipher([]byte("8bytes!!")); err != nil {
+// Pruebas: aunque sea código de prueba, no se admiten primitivas débiles (DES/RC4 eliminados).
+// Requiere importar "crypto/aes" y "crypto/cipher".
+func TestAesGcm(t *testing.T) {
+	// Clave AES-256 (32 bytes) de prueba: generada con `openssl rand -hex 32`, nunca reutilizar en producción.
+	key := []byte("0123456789abcdef0123456789abcdef")
+	block, err := aes.NewCipher(key)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := rc4.NewCipher([]byte("clave")); err != nil {
+	if _, err := cipher.NewGCM(block); err != nil {
 		t.Fatal(err)
 	}
-	_ = md5.Sum([]byte("fixture"))
+	_ = sha256.Sum256([]byte("fixture"))
 }
