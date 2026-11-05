@@ -41,11 +41,26 @@
                CT-VECTOR CT-CERO CT-AREA CT-TEXTO-LARGO CT-TEXTO
                CT-TEXTO-LARGO CT-CIFRADO CT-CERO CT-AREA.
        CIFRAR-GESTORIA.
-           CALL 'CSNBSYE' USING CT-RC CT-RAZON CT-SALIDA-LARGO
-               CT-SALIDA CT-CUENTA-DOS CT-REGLAS-TDES CT-LARGO-TDES
-               CT-CLAVE-CLARA CT-CERO CT-AREA CT-CERO CT-CERO
-               CT-VECTOR CT-CERO CT-AREA CT-TEXTO-LARGO CT-TEXTO
-               CT-TEXTO-LARGO CT-CIFRADO CT-CERO CT-AREA.
+      *    Reglas AES-256-GCM: 'AES     GCM     KEYIDENT' (3 reglas)
+      *    Clave AES de 256 bits almacenada en el CKDS (etiqueta)
+      *    IV de 12 bytes (96 bits) unico por mensaje
+      *    AAD opcional en CT-AAD; etiqueta (16 bytes) en CT-TAG
+           MOVE 3                  TO CT-CUENTA-TRES.
+           MOVE 'AES     GCM     KEYIDENT' TO CT-REGLAS-AES.
+           MOVE 64                 TO CT-LARGO-ETIQUETA.
+           MOVE 16                 TO CT-BLOQUE.
+           MOVE 12                 TO CT-VECTOR-LARGO.
+           MOVE 16                 TO CT-TAG-LARGO.
+           CALL 'CSNBSAE' USING CT-RC CT-RAZON CT-SALIDA-LARGO
+               CT-SALIDA CT-CUENTA-TRES CT-REGLAS-AES
+               CT-LARGO-ETIQUETA CT-ETIQUETA-AES256
+               CT-AAD-LARGO CT-AAD CT-BLOQUE
+               CT-VECTOR-LARGO CT-VECTOR CT-CERO CT-AREA
+               CT-TEXTO-LARGO CT-TEXTO
+               CT-TEXTO-LARGO CT-CIFRADO CT-TAG-LARGO CT-TAG.
+           IF CT-RC NOT = ZERO
+               PERFORM ERROR-CIFRADO
+           END-IF.
        CIFRAR-BANCO.
            CALL 'CSNBECO' USING CT-RC CT-RAZON CT-SALIDA-LARGO
                CT-SALIDA CT-CLAVE-DES CT-TEXTO CT-CIFRADO.
