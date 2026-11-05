@@ -79,24 +79,77 @@
                CT-CERO CT-AREA CT-CERO CT-AREA
                CT-CLAVE-LARGO CT-PUBLICA.
        FIRMAR-CIERRE.
+           *    FIRMA HIBRIDA: ED25519 + ML-DSA-65 (FIPS 204)
+      *    AMBAS FIRMAS DEBEN VERIFICARSE EN EL RECEPTOR
+           MOVE 2                  TO CT-CUENTA-DOS
+           MOVE 'EDDSA   '         TO CT-REGLAS-EDDSA(1:8)
+           MOVE 'SHA-512 '         TO CT-REGLAS-EDDSA(9:8)
            CALL 'CSNDDSG' USING CT-RC CT-RAZON CT-SALIDA-LARGO
-               CT-SALIDA CT-CUENTA-CUATRO CT-REGLAS-FIRMA
-               CT-CLAVE-LARGO CT-CLAVE CT-HASH-LARGO CT-HASH
-               CT-FIRMA-LARGO CT-FIRMA-BITS CT-FIRMA
+               CT-SALIDA CT-CUENTA-DOS CT-REGLAS-EDDSA
+               CT-CLAVE-ED-LARGO CT-CLAVE-ED CT-MSG-LARGO CT-MSG
+               CT-FIRMA-ED-LARGO CT-FIRMA-ED-BITS CT-FIRMA-ED
+           IF CT-RC NOT = ZERO
+               PERFORM ERROR-FIRMA
+           END-IF
+           MOVE 2                  TO CT-CUENTA-DOS
+           MOVE 'CRDL-DSA'         TO CT-REGLAS-MLDSA(1:8)
+           MOVE 'CRDLHASH'         TO CT-REGLAS-MLDSA(9:8)
            CALL 'CSNDDSG' USING CT-RC CT-RAZON CT-SALIDA-LARGO
-               CT-SALIDA CT-CUENTA-TRES CT-REGLAS-ECDSA
-               CT-CLAVE-LARGO CT-CLAVE CT-HASH-LARGO CT-HASH
-               CT-FIRMA-LARGO CT-FIRMA-BITS CT-FIRMA.
+               CT-SALIDA CT-CUENTA-DOS CT-REGLAS-MLDSA
+               CT-CLAVE-QSA-LARGO CT-CLAVE-QSA CT-MSG-LARGO CT-MSG
+               CT-FIRMA-QSA-LARGO CT-FIRMA-QSA-BITS CT-FIRMA-QSA
+           IF CT-RC NOT = ZERO
+               PERFORM ERROR-FIRMA
+           END-IF.
        CLAVE-SESION-BANCO.
-           CALL 'CSNDPKE' USING CT-RC CT-RAZON CT-SALIDA-LARGO
-               CT-SALIDA CT-CUENTA-UNA CT-REGLAS-PKE
-               CT-HASH-LARGO CT-HASH CT-CERO CT-AREA
-               CT-CLAVE-LARGO CT-PUBLICA CT-FIRMA-LARGO CT-FIRMA
+           *--- Acuerdo de clave HIBRIDO X25519 + ML-KEM-768 (FIPS 203) ---
+      *    (1) Componente clasico: X25519 via ICSF. CT-CLAVE y
+      *        CT-PUBLICA deben ser tokens ECC de curva 25519
+      *        (generados con CSNDPKB), NO curvas P-256/P-384.
            CALL 'CSNDEDH' USING CT-RC CT-RAZON CT-SALIDA-LARGO
                CT-SALIDA CT-CUENTA-UNA CT-REGLAS-EDH
                CT-CLAVE-LARGO CT-CLAVE CT-CERO CT-AREA
                CT-CLAVE-LARGO CT-PUBLICA CT-CERO CT-AREA
                CT-CERO CT-AREA CT-BITS-DERIVADOS CT-CERO CT-AREA
+           IF CT-RC NOT = ZERO
+               PERFORM CT-ERROR-CRIPTO
+           END-IF
+           MOVE CT-SALIDA TO CT-SS-X25519
+      *    (2) Componente post-cuantico: encapsulacion ML-KEM-768
+      *        contra la clave publica ML-KEM del par (sustituye a
+      *        CSNDPKE/RSA). Rutina 'PQCKEM' = wrapper Java que
+      *        invoca Bouncy Castle 1.78 (provider BCPQC).
+           MOVE 'ML-KEM-768' TO CT-KEM-ALG
+           MOVE 'ENCAPS    ' TO CT-KEM-OPER
+           CALL 'PQCKEM' USING CT-RC CT-RAZON
+               CT-KEM-ALG CT-KEM-OPER
+               CT-MLKEM-PUB-LARGO CT-MLKEM-PUB
+               CT-KEM-CT-LARGO CT-KEM-CT
+               CT-SS-MLKEM-LARGO CT-SS-MLKEM
+           IF CT-RC NOT = ZERO
+               PERFORM CT-ERROR-PQC
+           END-IF
+      *    (3) Combinacion de secretos: KDF SHA-256 sobre
+      *        SS-X25519 || SS-MLKEM || CT-KEM (ICSF CSNBOWH).
+      *        CT-KEM-CT se envia al par junto a la publica X25519.
+           STRING CT-SS-X25519 DELIMITED BY SIZE
+                  CT-SS-MLKEM  DELIMITED BY SIZE
+                  CT-KEM-CT    DELIMITED BY SIZE
+                  INTO CT-KDF-ENTRADA
+           END-STRING
+           MOVE 'SHA-256 ' TO CT-REGLAS-OWH(1)
+           MOVE 'ONLY    ' TO CT-REGLAS-OWH(2)
+           MOVE 2          TO CT-CUENTA-DOS
+           CALL 'CSNBOWH' USING CT-RC CT-RAZON CT-SALIDA-LARGO
+               CT-SALIDA CT-CUENTA-DOS CT-REGLAS-OWH
+               CT-KDF-ENTRADA-LARGO CT-KDF-ENTRADA
+               CT-CERO CT-AREA CT-HASH-LARGO CT-CLAVE-SESION
+           IF CT-RC NOT = ZERO
+               PERFORM CT-ERROR-CRIPTO
+           END-IF
+      *    (4) Borrado del material intermedio en memoria
+           MOVE LOW-VALUES TO CT-SS-X25519 CT-SS-MLKEM
+                              CT-KDF-ENTRADA
                CT-CERO CT-AREA CT-CERO CT-AREA CT-CERO CT-AREA
                CT-CERO CT-AREA CT-CERO CT-AREA CT-CLAVE-LARGO
                CT-CLAVE.
