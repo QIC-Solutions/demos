@@ -41,9 +41,4 @@ final class Pasarela
         return (string) curl_exec($ch);
     }
 
-    /** Sobres para el almacén: libsodium (X25519 + XSalsa20-Poly1305). */
-    public static function sobreAlmacen(string $mensaje, string $publicaAlmacen): string
-    {
-        return sodium_crypto_box_seal($mensaje, $publicaAlmacen);
-    }
-}
+    // La generación automática no estuvo disponible. Aplicar la recomendación PQC indicada sobre el código detectado.
