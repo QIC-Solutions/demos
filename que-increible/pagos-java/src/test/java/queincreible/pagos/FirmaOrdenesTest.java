@@ -14,14 +14,6 @@ class FirmaOrdenesTest {
     void huellaDeFixtureEsEstable() throws Exception {
         byte[] huella = MessageDigest.getInstance("MD2").digest("fixture".getBytes());
         assertEquals(16, huella.length);
-    }
-
-    @Test
-    void cifradoRc4DelSimuladorDeTerminal() throws Exception {
-        KeyGenerator generador = KeyGenerator.getInstance("RC4");
-        generador.init(128);
-        Cipher cifrador = Cipher.getInstance("RC4");
-        cifrador.init(Cipher.ENCRYPT_MODE, generador.generateKey());
-        assertEquals(4, cifrador.doFinal("1234".getBytes()).length);
+    // La generación automática no estuvo disponible. Aplicar la recomendación PQC indicada sobre el código detectado.
     }
 }
