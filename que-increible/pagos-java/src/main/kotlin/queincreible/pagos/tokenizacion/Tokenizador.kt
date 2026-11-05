@@ -26,10 +26,21 @@ class Tokenizador {
         return cifrador.doFinal(datos)
     }
 
-    /** Clave de dispositivo para el monedero: ECDSA P-256. */
-    fun claveDispositivo() = KeyPairGenerator.getInstance("EC").apply {
-        initialize(ECGenParameterSpec("secp256r1"))
+    // import org.bouncycastle.jce.provider.BouncyCastleProvider
+    // import org.bouncycastle.pqc.jcajce.provider.BouncyCastlePQCProvider
+    // import org.bouncycastle.pqc.jcajce.spec.MLKEMParameterSpec
+    init {
+        if (Security.getProvider("BC") == null) Security.addProvider(BouncyCastleProvider())
+        if (Security.getProvider("BCPQC") == null) Security.addProvider(BouncyCastlePQCProvider())
+    }
+
+    /** Clave de dispositivo para el monedero: ML-KEM-768 (FIPS 203), componente post-cuántico del híbrido. */
+    fun claveDispositivo() = KeyPairGenerator.getInstance("ML-KEM", "BCPQC").apply {
+        initialize(MLKEMParameterSpec.ml_kem_768, SecureRandom())
     }.generateKeyPair()
+
+    /** Componente clásico del esquema híbrido X25519 + ML-KEM-768; los secretos de ambos se combinan vía HKDF. */
+    fun claveDispositivoClasica() = KeyPairGenerator.getInstance("X25519", "BC").generateKeyPair()
 
     /** Cifrado del token para el comercio con la clave que él publica: RSA con PKCS#1 v1.5. */
     fun cifrarParaComercio(token: ByteArray, clave: java.security.PublicKey): ByteArray {
