@@ -26,10 +26,44 @@ class Tokenizador {
         return cifrador.doFinal(datos)
     }
 
-    /** Clave de dispositivo para el monedero: ECDSA P-256. */
-    fun claveDispositivo() = KeyPairGenerator.getInstance("EC").apply {
-        initialize(ECGenParameterSpec("secp256r1"))
-    }.generateKeyPair()
+    /** Clave de dispositivo para el monedero: híbrido X25519 + ML-KEM-768 (FIPS 203). */
+    data class ClaveDispositivoHibrida(val x25519: KeyPair, val mlKem: KeyPair)
+
+    fun claveDispositivo(): ClaveDispositivoHibrida {
+        if (Security.getProvider("BCPQC") == null) Security.addProvider(BouncyCastlePQCProvider())
+        if (Security.getProvider("BC") == null) Security.addProvider(BouncyCastleProvider())
+
+        val x25519 = KeyPairGenerator.getInstance("X25519", "BC").generateKeyPair()
+        val mlKem = KeyPairGenerator.getInstance("ML-KEM", "BCPQC").apply {
+            initialize(MLKEMParameterSpec.ml_kem_768, SecureRandom())
+        }.generateKeyPair()
+        return ClaveDispositivoHibrida(x25519, mlKem)
+    }
+
+    /** Encapsula un secreto para el dispositivo: ss = HKDF(ss_X25519 || ss_MLKEM). */
+    fun encapsularParaDispositivo(pubX25519: PublicKey, pubMlKem: PublicKey): Pair<ByteArray, SecretKey> {
+        // Parte clásica: X25519 efímero
+        val efimero = KeyPairGenerator.getInstance("X25519", "BC").generateKeyPair()
+        val ssEc = KeyAgreement.getInstance("X25519", "BC").apply {
+            init(efimero.private)
+            doPhase(pubX25519, true)
+        }.generateSecret()
+
+        // Parte post-cuántica: ML-KEM-768
+        val kem = KeyGenerator.getInstance("ML-KEM", "BCPQC").apply {
+            init(KEMGenerateSpec(pubMlKem, "AES"), SecureRandom())
+        }
+        val encap = kem.generateKey() as SecretKeyWithEncapsulation
+
+        // Combinación de secretos vía HKDF-SHA256
+        val hkdf = HKDFBytesGenerator(SHA256Digest()).apply {
+            init(HKDFParameters(ssEc + encap.encoded, null, "monedero-hibrido-v1".toByteArray()))
+        }
+        val claveFinal = ByteArray(32).also { hkdf.generateBytes(it, 0, it.size) }
+
+        val ctHibrido = efimero.public.encoded + encap.encapsulation
+        return ctHibrido to SecretKeySpec(claveFinal, "AES")
+    }
 
     /** Cifrado del token para el comercio con la clave que él publica: RSA con PKCS#1 v1.5. */
     fun cifrarParaComercio(token: ByteArray, clave: java.security.PublicKey): ByteArray {
