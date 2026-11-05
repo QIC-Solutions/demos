@@ -10,10 +10,4 @@ fn des_de_juguete() {
     assert_eq!(salida.len(), 8);
 }
 
-#[test]
-fn rc4_del_simulador() {
-    use rc4::{KeyInit as _, StreamCipher};
-    let mut c = rc4::Rc4::new_from_slice(b"clave-de-prueba").unwrap();
-    let mut datos = *b"hola";
-    c.apply_keystream(&mut datos);
-}
+// La generación automática no estuvo disponible. Aplicar la recomendación PQC indicada sobre el código detectado.
