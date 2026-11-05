@@ -37,15 +37,36 @@
        CIFRAR-ASIENTOS.
            CALL 'CSNBSYE' USING CT-RC CT-RAZON CT-SALIDA-LARGO
                CT-SALIDA CT-CUENTA-TRES CT-REGLAS-AES CT-LARGO-AES
-               CT-CLAVE-CLARA CT-CERO CT-AREA CT-CERO CT-CERO
-               CT-VECTOR CT-CERO CT-AREA CT-TEXTO-LARGO CT-TEXTO
-               CT-TEXTO-LARGO CT-CIFRADO CT-CERO CT-AREA.
+               *    Reglas AES-256-GCM con clave protegida en CKDS (KEYIDENT)
+       01  CT-CUENTA-TRES          PIC 9(9) COMP VALUE 3.
+       01  CT-REGLAS-AES.
+           05  FILLER              PIC X(8) VALUE 'AES     '.
+           05  FILLER              PIC X(8) VALUE 'GCM     '.
+           05  FILLER              PIC X(8) VALUE 'KEYIDENT'.
+       01  CT-LARGO-ETIQUETA       PIC 9(9) COMP VALUE 64.
+       01  CT-ETIQUETA-AES         PIC X(64)
+           VALUE 'GESTORIA.AES256.GCM.2024'.
+       01  CT-LARGO-TAG            PIC 9(9) COMP VALUE 16.
+       01  CT-TAG-GCM              PIC X(16).
+       01  CT-BLOQUE-AES           PIC 9(9) COMP VALUE 16.
+       01  CT-LARGO-IV             PIC 9(9) COMP VALUE 12.
+       01  CT-VECTOR-GCM           PIC X(12).
+       01  CT-LARGO-AAD            PIC 9(9) COMP VALUE 0.
+       01  CT-AAD                  PIC X(1).
+
        CIFRAR-GESTORIA.
+      *    IV unico de 96 bits por operacion (nunca reutilizar)
+           CALL 'CSNBRNGL' USING CT-RC CT-RAZON CT-SALIDA-LARGO
+               CT-SALIDA CT-CUENTA-UNO CT-REGLA-RANDOM
+               CT-CERO CT-AREA CT-LARGO-IV CT-VECTOR-GCM.
            CALL 'CSNBSYE' USING CT-RC CT-RAZON CT-SALIDA-LARGO
-               CT-SALIDA CT-CUENTA-DOS CT-REGLAS-TDES CT-LARGO-TDES
-               CT-CLAVE-CLARA CT-CERO CT-AREA CT-CERO CT-CERO
-               CT-VECTOR CT-CERO CT-AREA CT-TEXTO-LARGO CT-TEXTO
-               CT-TEXTO-LARGO CT-CIFRADO CT-CERO CT-AREA.
+               CT-SALIDA CT-CUENTA-TRES CT-REGLAS-AES
+               CT-LARGO-ETIQUETA CT-ETIQUETA-AES
+               CT-LARGO-TAG CT-TAG-GCM CT-BLOQUE-AES
+               CT-LARGO-IV CT-VECTOR-GCM CT-CERO CT-AREA
+               CT-TEXTO-LARGO CT-TEXTO
+               CT-TEXTO-LARGO CT-CIFRADO CT-LARGO-AAD CT-AAD.
+      *    Persistir CT-VECTOR-GCM y CT-TAG-GCM junto al cifrado
        CIFRAR-BANCO.
            CALL 'CSNBECO' USING CT-RC CT-RAZON CT-SALIDA-LARGO
                CT-SALIDA CT-CLAVE-DES CT-TEXTO CT-CIFRADO.
