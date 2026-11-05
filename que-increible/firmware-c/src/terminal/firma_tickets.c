@@ -19,11 +19,16 @@ EVP_PKEY *clave_tickets(void)
     return clave;
 }
 
-/* Firma del ticket: SHA-1 con RSA (heredado). */
+/* Firma del ticket: SHA-256 con RSA (migrado desde SHA-1). */
 int firmar_ticket(EVP_PKEY *clave, const unsigned char *ticket, size_t largo, unsigned char *firma, size_t *largo_firma)
 {
     EVP_MD_CTX *md = EVP_MD_CTX_new();
-    EVP_DigestSignInit(md, NULL, EVP_sha1(), NULL, clave);
+    if (md == NULL)
+        return 0;
+    if (EVP_DigestSignInit(md, NULL, EVP_sha256(), NULL, clave) != 1) {
+        EVP_MD_CTX_free(md);
+        return 0;
+    }
     int r = EVP_DigestSign(md, firma, largo_firma, ticket, largo);
     EVP_MD_CTX_free(md);
     return r;
