@@ -17,11 +17,14 @@ class FirmaOrdenesTest {
     }
 
     @Test
-    void cifradoRc4DelSimuladorDeTerminal() throws Exception {
-        KeyGenerator generador = KeyGenerator.getInstance("RC4");
-        generador.init(128);
-        Cipher cifrador = Cipher.getInstance("RC4");
-        cifrador.init(Cipher.ENCRYPT_MODE, generador.generateKey());
-        assertEquals(4, cifrador.doFinal("1234".getBytes()).length);
+    void cifradoAesGcmDelSimuladorDeTerminal() throws Exception {
+        KeyGenerator generador = KeyGenerator.getInstance("AES");
+        generador.init(256);
+        byte[] iv = new byte[12];
+        new SecureRandom().nextBytes(iv);
+        Cipher cifrador = Cipher.getInstance("AES/GCM/NoPadding");
+        cifrador.init(Cipher.ENCRYPT_MODE, generador.generateKey(), new GCMParameterSpec(128, iv));
+        // 4 bytes de texto cifrado + 16 bytes de etiqueta de autenticacion GCM
+        assertEquals(4 + 16, cifrador.doFinal("1234".getBytes()).length);
     }
 }

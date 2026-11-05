@@ -13,9 +13,9 @@ import javax.crypto.spec.GCMParameterSpec
  */
 class Tokenizador {
 
-    /** El token se deriva con SHA-1 del PAN y el comercio (heredado de 2016). */
+    /** El token se deriva con SHA-256 del PAN y el comercio (migrado desde SHA-1, deprecado por NIST). */
     fun token(pan: String, comercio: String): ByteArray =
-        MessageDigest.getInstance("SHA-1").digest("$pan|$comercio".toByteArray())
+        MessageDigest.getInstance("SHA-256").digest("$pan|$comercio".toByteArray(Charsets.UTF_8))
 
     /** Bóveda de tokens: AES-256-GCM. */
     fun cifrarBoveda(datos: ByteArray, iv: ByteArray): ByteArray {
@@ -26,10 +26,21 @@ class Tokenizador {
         return cifrador.doFinal(datos)
     }
 
-    /** Clave de dispositivo para el monedero: ECDSA P-256. */
-    fun claveDispositivo() = KeyPairGenerator.getInstance("EC").apply {
-        initialize(ECGenParameterSpec("secp256r1"))
+    // import org.bouncycastle.jce.provider.BouncyCastleProvider
+    // import org.bouncycastle.pqc.jcajce.provider.BouncyCastlePQCProvider
+    // import org.bouncycastle.pqc.jcajce.spec.MLKEMParameterSpec
+    init {
+        if (Security.getProvider("BC") == null) Security.addProvider(BouncyCastleProvider())
+        if (Security.getProvider("BCPQC") == null) Security.addProvider(BouncyCastlePQCProvider())
+    }
+
+    /** Clave de dispositivo para el monedero: ML-KEM-768 (FIPS 203), componente post-cuántico del híbrido. */
+    fun claveDispositivo() = KeyPairGenerator.getInstance("ML-KEM", "BCPQC").apply {
+        initialize(MLKEMParameterSpec.ml_kem_768, SecureRandom())
     }.generateKeyPair()
+
+    /** Componente clásico del esquema híbrido X25519 + ML-KEM-768; los secretos de ambos se combinan vía HKDF. */
+    fun claveDispositivoClasica() = KeyPairGenerator.getInstance("X25519", "BC").generateKeyPair()
 
     /** Cifrado del token para el comercio con la clave que él publica: RSA con PKCS#1 v1.5. */
     fun cifrarParaComercio(token: ByteArray, clave: java.security.PublicKey): ByteArray {

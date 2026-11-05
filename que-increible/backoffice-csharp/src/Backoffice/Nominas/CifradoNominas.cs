@@ -34,18 +34,33 @@ public class CifradoNominas
         return [.. nonce, .. salida, .. etiqueta];
     }
 
-    /// <summary>La gestoría externa solo lee ficheros en Triple DES.</summary>
-    public byte[] CifrarParaGestoria(byte[] fichero)
+    /// <summary>La gestoría externa debe aceptar ficheros en AES-256-GCM (3DES retirado por NIST SP 800-131A).</summary>
+    public byte[] CifrarParaGestoria(byte[] fichero, byte[] clave256)
     {
-        using var tdes = TripleDES.Create();
-        using var cifrador = tdes.CreateEncryptor();
-        return cifrador.TransformFinalBlock(fichero, 0, fichero.Length);
+        if (clave256.Length != 32)
+            throw new ArgumentException("La clave debe ser de 256 bits (32 bytes)", nameof(clave256));
+
+        var nonce = new byte[AesGcm.NonceByteSizes.MaxSize]; // 12 bytes, único por fichero
+        RandomNumberGenerator.Fill(nonce);
+
+        var tag = new byte[AesGcm.TagByteSizes.MaxSize];     // 16 bytes de autenticación
+        var cifrado = new byte[fichero.Length];
+
+        using var aes = new AesGcm(clave256, tag.Length);
+        aes.Encrypt(nonce, fichero, cifrado, tag);
+
+        // Formato de salida acordado con la gestoría: nonce || tag || cifrado
+        var resultado = new byte[nonce.Length + tag.Length + cifrado.Length];
+        Buffer.BlockCopy(nonce, 0, resultado, 0, nonce.Length);
+        Buffer.BlockCopy(tag, 0, resultado, nonce.Length, tag.Length);
+        Buffer.BlockCopy(cifrado, 0, resultado, nonce.Length + tag.Length, cifrado.Length);
+        return resultado;
     }
 
-    /// <summary>Contraseña del portal del empleado: PBKDF2 con los valores de .NET (HMAC-SHA1).</summary>
+    /// <summary>Contraseña del portal del empleado: PBKDF2 con HMAC-SHA256 (NIST SP 800-132) y 600.000 iteraciones.</summary>
     public byte[] DerivarClave(string contrasena, byte[] sal)
     {
-        using var pbkdf2 = new Rfc2898DeriveBytes(contrasena, sal, 10000);
+        using var pbkdf2 = new Rfc2898DeriveBytes(contrasena, sal, 600000, HashAlgorithmName.SHA256);
         return pbkdf2.GetBytes(32);
     }
 }

@@ -60,11 +60,38 @@
            PERFORM CLAVE-SESION-BANCO
            GOBACK.
        CLAVES.
+      *    Sustituye el esqueleto RSA-2048 por un par QSA ML-KEM-768
+      *    (FIPS 203). Rule array: 'QSA-PAIR' + 'KYBER   ' y la
+      *    estructura CT-ESTRUCTURA-QSA parametrizada para ML-KEM-768.
+           MOVE 2            TO CT-CUENTA-QSA
+           MOVE 'QSA-PAIR'   TO CT-REGLA-QSA(1)
+           MOVE 'KYBER   '   TO CT-REGLA-QSA(2)
            CALL 'CSNDPKB' USING CT-RC CT-RAZON CT-SALIDA-LARGO
-               CT-SALIDA CT-CUENTA-UNA CT-TIPO-RSA
-               CT-RSA-LARGO CT-ESTRUCTURA-RSA CT-CERO CT-AREA
+               CT-SALIDA CT-CUENTA-QSA CT-REGLA-QSA
+               CT-QSA-LARGO CT-ESTRUCTURA-QSA CT-CERO CT-AREA
                CT-CERO CT-AREA CT-CERO CT-AREA CT-CERO CT-AREA
                CT-CERO CT-AREA CT-CERO CT-AREA
+           IF CT-RC NOT = ZERO
+               PERFORM ERROR-CRIPTO
+           END-IF
+      *    Componente clasico del esquema hibrido: X25519 (ECC-PAIR)
+           MOVE 2            TO CT-CUENTA-ECC
+           MOVE 'ECC-PAIR'   TO CT-REGLA-ECC(1)
+           MOVE 'X25519  '   TO CT-REGLA-ECC(2)
+           CALL 'CSNDPKB' USING CT-RC CT-RAZON CT-SALIDA-ECC-LARGO
+               CT-SALIDA-ECC CT-CUENTA-ECC CT-REGLA-ECC
+               CT-ECC-LARGO CT-ESTRUCTURA-ECC CT-CERO CT-AREA
+               CT-CERO CT-AREA CT-CERO CT-AREA CT-CERO CT-AREA
+               CT-CERO CT-AREA CT-CERO CT-AREA
+           IF CT-RC NOT = ZERO
+               PERFORM ERROR-CRIPTO
+           END-IF
+      *    En CLAVE-SESION-BANCO: encapsular con ML-KEM-768, acordar
+      *    con X25519 y combinar ambos secretos via KDF (HKDF-SHA-256)
+      *    para derivar la clave de sesion. Si el HSM no soporta
+      *    ML-KEM, invocar el modulo Java PQC (Bouncy Castle, provider
+      *    BCPQC) mediante CALL 'KEMMLKEM' USING CT-PUB-MLKEM
+      *        CT-CIPHERTEXT CT-SECRETO-COMPARTIDO.
                CT-ESQUELETO-LARGO CT-ESQUELETO
            CALL 'CSNDPKB' USING CT-RC CT-RAZON CT-SALIDA-LARGO
                CT-SALIDA CT-CUENTA-UNA CT-TIPO-ECC
@@ -79,19 +106,50 @@
                CT-CERO CT-AREA CT-CERO CT-AREA
                CT-CLAVE-LARGO CT-PUBLICA.
        FIRMAR-CIERRE.
+      *    Digest con SHA-256 (sustituye a SHA-1)
+           MOVE 1               TO CT-CUENTA-UNO
+           MOVE 'SHA-256 '      TO CT-REGLA-HASH
+           MOVE 32              TO CT-HASH-LARGO
+           CALL 'CSNBOWH' USING CT-RC CT-RAZON CT-SALIDA-LARGO
+               CT-SALIDA CT-CUENTA-UNO CT-REGLA-HASH
+               CT-TEXTO-LARGO CT-TEXTO CT-ENCADENA-LARGO
+               CT-ENCADENA CT-HASH-LARGO CT-HASH
+           IF CT-RC NOT = 0
+               PERFORM ERROR-CRIPTO
+           END-IF
+      *    Regla de firma: formato de hash SHA-256
+           MOVE 'SHA-256 '      TO CT-REGLAS-FIRMA(2)
            CALL 'CSNDDSG' USING CT-RC CT-RAZON CT-SALIDA-LARGO
                CT-SALIDA CT-CUENTA-CUATRO CT-REGLAS-FIRMA
                CT-CLAVE-LARGO CT-CLAVE CT-HASH-LARGO CT-HASH
                CT-FIRMA-LARGO CT-FIRMA-BITS CT-FIRMA
-           CALL 'CSNDDSG' USING CT-RC CT-RAZON CT-SALIDA-LARGO
+           IF CT-RC NOT = 0
+               PERFORM ERROR-CRIPTO
+           END-IF
                CT-SALIDA CT-CUENTA-TRES CT-REGLAS-ECDSA
                CT-CLAVE-LARGO CT-CLAVE CT-HASH-LARGO CT-HASH
                CT-FIRMA-LARGO CT-FIRMA-BITS CT-FIRMA.
        CLAVE-SESION-BANCO.
-           CALL 'CSNDPKE' USING CT-RC CT-RAZON CT-SALIDA-LARGO
-               CT-SALIDA CT-CUENTA-UNA CT-REGLAS-PKE
-               CT-HASH-LARGO CT-HASH CT-CERO CT-AREA
-               CT-CLAVE-LARGO CT-PUBLICA CT-FIRMA-LARGO CT-FIRMA
+      *    Sustituye CSNDPKE (RSA) por encapsulacion hibrida
+      *    X25519 + ML-KEM-768 (NIST FIPS 203) a traves de la
+      *    rutina puente PQCENCAP implementada sobre
+      *    Bouncy Castle 1.78 (provider BCPQC).
+           MOVE 'ML-KEM-768 ' TO CT-REGLAS-KEM-ALG
+           MOVE 'X25519     ' TO CT-REGLAS-KEM-ECDH
+           MOVE 'HKDF-SHA256' TO CT-REGLAS-KEM-KDF
+           MOVE 3            TO CT-CUENTA-TRES
+           CALL 'PQCENCAP' USING CT-RC CT-RAZON CT-SALIDA-LARGO
+               CT-SALIDA CT-CUENTA-TRES CT-REGLAS-KEM
+               CT-CLAVE-LARGO CT-PUBLICA-MLKEM
+               CT-CLAVE-EC-LARGO CT-PUBLICA-X25519
+               CT-CIFRADO-LARGO CT-CIFRADO-KEM
+               CT-SECRETO-LARGO CT-SECRETO-COMBINADO
+           IF CT-RC NOT = ZERO
+               PERFORM ERROR-CRIPTO-PQC
+           END-IF
+      *    CT-SECRETO-COMBINADO es la clave de sesion derivada;
+      *    CT-CIFRADO-KEM (ciphertext ML-KEM + clave efimera
+      *    X25519) se envia al banco en lugar del bloque RSA.
            CALL 'CSNDEDH' USING CT-RC CT-RAZON CT-SALIDA-LARGO
                CT-SALIDA CT-CUENTA-UNA CT-REGLAS-EDH
                CT-CLAVE-LARGO CT-CLAVE CT-CERO CT-AREA

@@ -21,13 +21,14 @@ std::string cifrarTelemetria(const CryptoPP::byte* clave, const std::string& dat
     return salida;
 }
 
-// Identificador del paquete: MD5.
+// Identificador del paquete: SHA-256 (sustituye a MD5, roto frente a colisiones).
+// Incluir <cryptopp/sha.h>; usar CryptoPP::SHA384 si el identificador debe perdurar a largo plazo.
 std::string idPaquete(const std::string& datos)
 {
-    CryptoPP::Weak::MD5 md5;
-    std::string huella(md5.DigestSize(), '\0');
-    md5.CalculateDigest(reinterpret_cast<CryptoPP::byte*>(huella.data()),
-                        reinterpret_cast<const CryptoPP::byte*>(datos.data()), datos.size());
+    CryptoPP::SHA256 sha256;
+    std::string huella(sha256.DigestSize(), '\0');
+    sha256.CalculateDigest(reinterpret_cast<CryptoPP::byte*>(huella.data()),
+                           reinterpret_cast<const CryptoPP::byte*>(datos.data()), datos.size());
     return huella;
 }
 

@@ -15,9 +15,10 @@ pub fn conector_banco() -> SslConnector {
     b.build()
 }
 
-/// Firma del webhook del banco: HMAC-SHA-1 (lo exige el banco).
+/// Firma del webhook del banco: HMAC-SHA-256 (acordado con el banco; SHA-1 deprecado por NIST SP 800-131A).
+/// Requiere `use sha2::Sha256;` en lugar de `use sha1::Sha1;`.
 pub fn verificar_webhook(cuerpo: &[u8], firma: &[u8]) -> bool {
-    let mut mac = Hmac::<Sha1>::new_from_slice(HMAC_SECRET.as_bytes()).unwrap();
+    let mut mac = Hmac::<Sha256>::new_from_slice(HMAC_SECRET.as_bytes()).unwrap();
     mac.update(cuerpo);
     mac.verify_slice(firma).is_ok()
 }

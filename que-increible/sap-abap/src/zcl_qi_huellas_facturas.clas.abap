@@ -21,15 +21,20 @@ CLASS zcl_qi_huellas_facturas IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD huella_proveedor.
-    " Sin if_algorithm: SHA-1, el valor por defecto de SAP.
+    " Algoritmo explícito SHA-256 (FIPS 180-4). Para retención larga usar 'SHA384' o 'SHA512'.
+    " Nunca omitir if_algorithm: el valor por defecto de SAP es SHA-1 (deprecado por NIST).
     cl_abap_message_digest=>calculate_hash_for_char(
-      EXPORTING if_data       = iv_texto
+      EXPORTING if_algorithm  = 'SHA256'
+                if_data       = iv_texto
       IMPORTING ef_hashstring = rv_huella ).
   ENDMETHOD.
 
   METHOD huella_legada.
+    " MD5 retirado: huella recalculada con SHA-384 (resistente a colisiones y apta a largo plazo).
+    " Declarar en la sección PRIVATE de la clase:
+    "   CONSTANTS co_alg_sha384 TYPE string VALUE 'SHA384'.
     CALL METHOD cl_abap_message_digest=>calculate_hash_for_raw
-      EXPORTING if_algorithm  = co_alg_legado
+      EXPORTING if_algorithm  = co_alg_sha384
                 if_data       = iv_datos
       IMPORTING ef_hashstring = rv_huella.
   ENDMETHOD.
@@ -46,8 +51,12 @@ CLASS zcl_qi_huellas_facturas IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD firmar_sesion.
-    " get_instance sin algoritmo: HMAC-SHA-1.
-    DATA(lo_hmac) = cl_abap_hmac=>get_instance( if_key = iv_clave ).
+    " get_instance con algoritmo explícito: HMAC-SHA-256 (clave >= 32 bytes).
+    DATA(lo_hmac) = cl_abap_hmac=>get_instance(
+                      if_algorithm = 'SHA256'
+                      if_key       = iv_clave ).
+    lo_hmac->update( if_data = iv_datos ).
     lo_hmac->final( ).
+    DATA(lv_huella) = lo_hmac->get_hmac( ).
   ENDMETHOD.
 ENDCLASS.

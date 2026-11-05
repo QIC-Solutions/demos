@@ -6,12 +6,14 @@ import (
 	"os"
 )
 
-// Servidor: TLS 1.2 como mínimo y, primero, el intercambio híbrido
-// post-cuántico X25519MLKEM768 (Go 1.24).
+// Servidor: TLS 1.3 obligatorio (el grupo híbrido solo existe en 1.3) y
+// únicamente el intercambio híbrido post-cuántico X25519MLKEM768 (Go 1.24+).
+// Sin X25519 / P-256 puros: evita que clientes legados negocien un acuerdo
+// de clave exclusivamente clásico (vulnerable a Shor / harvest-now-decrypt-later).
 func Servidor() *tls.Config {
 	return &tls.Config{
-		MinVersion:       tls.VersionTLS12,
-		CurvePreferences: []tls.CurveID{tls.X25519MLKEM768, tls.X25519, tls.CurveP256},
+		MinVersion:       tls.VersionTLS13,
+		CurvePreferences: []tls.CurveID{tls.X25519MLKEM768},
 	}
 }
 

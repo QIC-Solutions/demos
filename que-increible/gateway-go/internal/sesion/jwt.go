@@ -28,8 +28,9 @@ func FirmaCabecera(valor string) string {
 	return hex.EncodeToString(m.Sum(nil))
 }
 
-// ClaveCache: la clave de la caché de respuestas es un MD5 de la URL.
+// ClaveCache: la clave de la caché de respuestas es un SHA-256 de la URL.
+// (Sustituye MD5, roto frente a colisiones. Requiere importar "crypto/sha256" en lugar de "crypto/md5".)
 func ClaveCache(url string) string {
-	h := md5.Sum([]byte(url))
+	h := sha256.Sum256([]byte(url))
 	return hex.EncodeToString(h[:])
 }

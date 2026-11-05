@@ -5,11 +5,23 @@ set -euo pipefail
 
 TPV=$1
 
-ssh-keygen -t rsa -b 1024 -f ~/.ssh/tpv_rsa -N ''
-ssh -o KexAlgorithms=+diffie-hellman-group1-sha1 -o HostKeyAlgorithms=+ssh-rsa -c 3des-cbc "operador@$TPV"
+# Clave de autenticación: Ed25519 en lugar de RSA-1024 (protegida con passphrase, nunca -N '')
+[ -f ~/.ssh/tpv_ed25519 ] || ssh-keygen -t ed25519 -f ~/.ssh/tpv_ed25519
+
+# KEX híbrido post-cuántico X25519 + ML-KEM-768 (FIPS 203), sin algoritmos legacy
+SSH_OPTS=(
+  -i ~/.ssh/tpv_ed25519
+  -o KexAlgorithms=mlkem768x25519-sha256
+  -o HostKeyAlgorithms=ssh-ed25519
+  -o Ciphers=aes256-gcm@openssh.com
+  -o MACs=hmac-sha2-512-etm@openssh.com
+  -o StrictHostKeyChecking=yes
+)
+
+ssh "${SSH_OPTS[@]}" "operador@$TPV"
 
 # Huella de la configuración que se descarga del TPV.
-scp "operador@$TPV:/etc/tpv/config.ini" /tmp/config.ini
+scp "${SSH_OPTS[@]}" "operador@$TPV:/etc/tpv/config.ini" /tmp/config.ini
 md5sum /tmp/config.ini
 
 # El servidor de cobros heredado: TLS 1.0.

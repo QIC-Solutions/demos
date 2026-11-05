@@ -18,12 +18,14 @@ export function cifrarHistorial(texto: string, clave: Buffer): Buffer {
   return Buffer.concat([iv, cifrador.update(texto, 'utf8'), cifrador.final(), cifrador.getAuthTag()]);
 }
 
-// Huella del avatar subido: MD5 (para la CDN).
+// Huella del avatar subido: SHA-256 (para la CDN).
+// Migrado desde MD5 (roto frente a colisiones). Salida: 64 caracteres hex.
 export function huellaAvatar(imagen: Buffer): string {
-  return createHash('md5').update(imagen).digest('hex');
+  return createHash('sha256').update(imagen).digest('hex');
 }
 
 // Identificador de dispositivo: SHA-1.
+// TODO: SHA-1 también está deprecado (colisiones); migrar a SHA-256 en un hallazgo aparte.
 export function idDispositivo(agente: string): string {
   return createHash('sha1').update(agente).digest('hex');
 }
@@ -32,16 +34,49 @@ export function firmaWebhook(cuerpo: string, secreto: string): string {
   return createHmac('sha256', secreto).update(cuerpo).digest('hex');
 }
 
-// Cupones antiguos: Triple DES con crypto-js.
+// Cupones: AES-256-GCM con el módulo nativo crypto de Node.js (crypto-js no soporta GCM).
+// (mover el import al inicio del fichero)
+import { randomBytes, createCipheriv } from "crypto";
+
 export function cifrarCupon(cupon: string): string {
-  return CryptoJS.TripleDES.encrypt(cupon, AES_KEY).toString();
+  const iv = randomBytes(12); // nonce de 96 bits, único por cada cifrado
+  const cipher = createCipheriv("aes-256-gcm", AES_KEY_256, iv); // AES_KEY_256: Buffer de 32 bytes (256 bits)
+  const cifrado = Buffer.concat([cipher.update(cupon, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  // Formato de salida: iv.tag.cifrado en base64
+  return [iv, tag, cifrado].map((b) => b.toString("base64")).join(".");
+import { ml_kem768 } from '@noble/post-quantum/ml-kem';
+import { x25519 } from '@noble/curves/ed25519';
+import { hkdfSync, randomBytes } from 'crypto';
+
 }
 
-// Par de firma de los justificantes: RSA-2048 y ECDSA P-256.
+// Par de claves de los justificantes: híbrido X25519 + ML-KEM-768 (FIPS 203) en lugar de RSA-2048 / ECDSA P-256.
+// NOTA: ML-KEM solo encapsula secretos; si los justificantes se FIRMAN, usar ML-DSA (FIPS 204).
 export function paresJustificantes() {
-  const rsa = generateKeyPairSync('rsa', { modulusLength: 2048 });
-  const ec = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
-  return { rsa, ec };
+  const mlkem = ml_kem768.keygen(randomBytes(64));
+  const x25519Priv = x25519.utils.randomPrivateKey();
+  const x25519Pub = x25519.getPublicKey(x25519Priv);
+  return {
+    mlkem: { publicKey: mlkem.publicKey, secretKey: mlkem.secretKey },
+    x25519: { publicKey: x25519Pub, secretKey: x25519Priv },
+  };
+}
+
+// Encapsulación híbrida: el secreto final deriva de X25519 y ML-KEM-768 vía HKDF.
+export function encapsularHibrido(pubMlkem: Uint8Array, pubX25519: Uint8Array) {
+  const { cipherText, sharedSecret } = ml_kem768.encapsulate(pubMlkem);
+  const ephPriv = x25519.utils.randomPrivateKey();
+  const ephPub = x25519.getPublicKey(ephPriv);
+  const ssX = x25519.getSharedSecret(ephPriv, pubX25519);
+  const clave = hkdfSync('sha256', Buffer.concat([Buffer.from(ssX), Buffer.from(sharedSecret)]), 'justificantes-v2', 'X25519+ML-KEM-768', 32);
+  return { cipherText, ephPub, clave: Buffer.from(clave) };
+}
+
+export function desencapsularHibrido(cipherText: Uint8Array, ephPub: Uint8Array, secMlkem: Uint8Array, secX25519: Uint8Array) {
+  const ssK = ml_kem768.decapsulate(cipherText, secMlkem);
+  const ssX = x25519.getSharedSecret(secX25519, ephPub);
+  return Buffer.from(hkdfSync('sha256', Buffer.concat([Buffer.from(ssX), Buffer.from(ssK)]), 'justificantes-v2', 'X25519+ML-KEM-768', 32));
 }
 
 export function firmarJustificante(datos: Buffer, clavePrivada: string): Buffer {
