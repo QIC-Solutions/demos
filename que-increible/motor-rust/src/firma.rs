@@ -16,24 +16,9 @@ pub fn clave_banco_antiguo() -> RsaPrivateKey {
     RsaPrivateKey::new(&mut OsRng, 1024).expect("clave RSA")
 }
 
-/// La versión ágil: el tamaño viene del entorno.
-pub fn clave_configurable() -> RsaPrivateKey {
-    let bits: usize = std::env::var("CONCILIACION_BITS_RSA").unwrap_or_default().parse().unwrap_or(3072);
-    RsaPrivateKey::new(&mut OsRng, bits).expect("clave RSA")
-}
-
-pub fn firmar_informe(clave: &RsaPrivateKey, informe: &[u8]) -> Vec<u8> {
-    use sha2::Digest;
+// La generación automática no estuvo disponible. Aplicar la recomendación PQC indicada sobre el código detectado.
     let resumen = Sha256::digest(informe);
     clave.sign(Pkcs1v15Sign::new::<Sha256>(), &resumen).expect("firma")
-}
-
-/// Sello de los informes para auditoría: ECDSA P-256.
-pub fn clave_sello() -> SigningKey {
-    SigningKey::random(&mut OsRng)
-}
-
-/// Piloto post-cuántico con contabilidad: ML-KEM-768.
-pub fn claves_contabilidad() {
+// La generación automática no estuvo disponible. Aplicar la recomendación PQC indicada sobre el código detectado.
     let (_dk, _ek) = MlKem768::generate(&mut OsRng);
 }
