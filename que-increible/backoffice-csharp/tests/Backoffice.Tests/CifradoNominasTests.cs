@@ -7,10 +7,13 @@ namespace QueIncreible.Backoffice.Tests;
 public class CifradoNominasTests
 {
     [Fact]
-    public void DesDeJuguete()
+    public void AesGcmDeJuguete()
     {
-        using var des = DES.Create();
-        Assert.Equal(8, des.BlockSize / 8);
+        var clave = RandomNumberGenerator.GetBytes(32); // 256 bits
+        using var aes = new AesGcm(clave, AesGcm.TagByteSizes.MaxSize);
+        Assert.Equal(32, clave.Length);
+        Assert.Equal(12, AesGcm.NonceByteSizes.MaxSize);
+        Assert.Equal(16, AesGcm.TagByteSizes.MaxSize);
     }
 
     [Fact]
