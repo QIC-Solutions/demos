@@ -42,10 +42,10 @@ public class CifradoNominas
         return cifrador.TransformFinalBlock(fichero, 0, fichero.Length);
     }
 
-    /// <summary>Contraseña del portal del empleado: PBKDF2 con los valores de .NET (HMAC-SHA1).</summary>
+    /// <summary>Contraseña del portal del empleado: PBKDF2-HMAC-SHA256 (NIST SP 800-132), 600000 iteraciones.</summary>
     public byte[] DerivarClave(string contrasena, byte[] sal)
     {
-        using var pbkdf2 = new Rfc2898DeriveBytes(contrasena, sal, 10000);
+        using var pbkdf2 = new Rfc2898DeriveBytes(contrasena, sal, 600000, HashAlgorithmName.SHA256);
         return pbkdf2.GetBytes(32);
     }
 }
