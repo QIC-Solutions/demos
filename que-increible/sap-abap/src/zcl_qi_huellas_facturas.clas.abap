@@ -46,8 +46,11 @@ CLASS zcl_qi_huellas_facturas IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD firmar_sesion.
-    " get_instance sin algoritmo: HMAC-SHA-1.
-    DATA(lo_hmac) = cl_abap_hmac=>get_instance( if_key = iv_clave ).
+    " get_instance con algoritmo explícito: HMAC-SHA-256 (nunca confiar en el default SHA-1).
+    " Para huellas de larga duración usar if_algorithm = 'SHA512'.
+    DATA(lo_hmac) = cl_abap_hmac=>get_instance(
+                      if_algorithm = 'SHA256'
+                      if_key       = iv_clave ).
     lo_hmac->final( ).
   ENDMETHOD.
 ENDCLASS.
