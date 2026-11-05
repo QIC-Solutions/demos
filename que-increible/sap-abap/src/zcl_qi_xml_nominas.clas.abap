@@ -9,12 +9,24 @@ ENDCLASS.
 CLASS zcl_qi_xml_nominas IMPLEMENTATION.
   METHOD cifrar.
     DATA lv_cifrado TYPE xstring.
-    " Versión de 2012: sin algorithm, 3DES-CBC (el valor por defecto de SAP).
+    DATA lv_mac     TYPE xstring.
+    " Remediado: AES-256 explícito (PEM => IV aleatorio generado y prefijado por SAP).
+    " iv_clave debe ser una clave AES-256 (32 bytes) nueva, distinta de la antigua 3DES.
     cl_sec_sxml_writer=>encrypt(
       EXPORTING plaintext  = iv_datos
                 key        = iv_clave
+                algorithm  = cl_sec_sxml_writer=>co_aes256_algorithm_pem
       IMPORTING ciphertext = lv_cifrado ).
-    " Versión nueva: AES-256-CBC.
+    " Cifrado autenticado (encrypt-then-MAC) con HMAC-SHA256 y clave MAC independiente (32 bytes).
+    cl_abap_hmac=>calculate_hmac_for_raw(
+      EXPORTING if_algorithm     = 'SHA256'
+                if_key           = iv_clave_mac
+                if_data          = lv_cifrado
+      IMPORTING ef_hmacxstring   = lv_mac ).
+    " Salida: ciphertext || HMAC (verificar el HMAC antes de descifrar).
+    rv_resultado = lv_cifrado && lv_mac.
+  ENDMETHOD.
+ENDCLASS.
     cl_sec_sxml_writer=>encrypt(
       EXPORTING plaintext  = iv_datos
                 key        = iv_clave
