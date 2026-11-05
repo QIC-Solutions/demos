@@ -14,6 +14,9 @@ FORM firmar_remesa.
   DATA: lt_entrada  TYPE STANDARD TABLE OF ssfbin,
         lt_firmada  TYPE STANDARD TABLE OF ssfbin,
         lt_firmante TYPE STANDARD TABLE OF ssfinfo.
+  " Resumen quantum/colision-safe: SHA-256 (usar 'SHA384' para conservación a largo plazo)
+  CONSTANTS: lc_resumen_firma TYPE ssfhash VALUE 'SHA256'.
+  gv_resumen_firma = lc_resumen_firma.
   CALL FUNCTION 'SSF_KRN_SIGN'
     EXPORTING
       str_format  = 'PKCS7'
@@ -28,11 +31,21 @@ FORM cifrar_remesa.
   DATA: lt_entrada TYPE STANDARD TABLE OF ssfbin,
         lt_sobre   TYPE STANDARD TABLE OF ssfbin,
         lt_destino TYPE STANDARD TABLE OF ssfinfo,
-        lv_cifrado TYPE ssfsymalg.
-  SELECT SINGLE valor FROM zqi_param_cripto INTO @lv_cifrado WHERE clave = 'SOBRE_SEPA'.
-  CALL FUNCTION 'SSF_KRN_ENVELOPE'
+        lv_cifrado TYPE ssfsymalg,
+        lv_kem     TYPE string,
+        lv_kdf     TYPE string.
+  " Sobre híbrido post-cuántico (FIPS 203): X25519 + ML-KEM-768 -> HKDF -> AES-256-GCM.
+  " SSF_KRN_ENVELOPE/PKCS7 (RSA/ECDH) queda retirado para SEPA.
+  SELECT SINGLE valor FROM zqi_param_cripto INTO @lv_cifrado WHERE clave = 'SOBRE_SEPA'.      " 'AES256-GCM'
+  SELECT SINGLE valor FROM zqi_param_cripto INTO @lv_kem     WHERE clave = 'SOBRE_SEPA_KEM'.  " 'X25519+ML-KEM-768'
+  SELECT SINGLE valor FROM zqi_param_cripto INTO @lv_kdf     WHERE clave = 'SOBRE_SEPA_KDF'.  " 'HKDF-SHA256'
+  " ZQI_PQC_ENVELOPE delega en el servicio Java zqi-pqc-envelope (Bouncy Castle, provider BCPQC)
+  " vía RFC/HTTP; recibe las claves públicas ML-KEM-768 y X25519 del destinatario desde zqi_pqc_keys.
+  CALL FUNCTION 'ZQI_PQC_ENVELOPE'
     EXPORTING
-      str_format       = 'PKCS7'
+      str_format       = 'CMS_HYBRID_KEM'
+      str_kem_alg      = lv_kem
+      str_kdf_alg      = lv_kdf
       str_sym_encr_alg = lv_cifrado
     TABLES
       ostr_input_data     = lt_entrada
