@@ -42,10 +42,4 @@ public class CifradoNominas
         return cifrador.TransformFinalBlock(fichero, 0, fichero.Length);
     }
 
-    /// <summary>Contraseña del portal del empleado: PBKDF2 con los valores de .NET (HMAC-SHA1).</summary>
-    public byte[] DerivarClave(string contrasena, byte[] sal)
-    {
-        using var pbkdf2 = new Rfc2898DeriveBytes(contrasena, sal, 10000);
-        return pbkdf2.GetBytes(32);
-    }
-}
+    // La generación automática no estuvo disponible. Aplicar la recomendación PQC indicada sobre el código detectado.
