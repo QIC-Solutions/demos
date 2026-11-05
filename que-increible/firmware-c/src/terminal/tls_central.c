@@ -16,7 +16,13 @@ SSL_CTX *contexto_central(void)
 SSL_CTX *contexto_nuevo(void)
 {
     SSL_CTX *ctx = SSL_CTX_new(TLS_client_method());
+    if (ctx == NULL)
+        return NULL;
     SSL_CTX_set_min_proto_version(ctx, TLS1_3_VERSION);
-    SSL_CTX_set1_groups_list(ctx, "X25519MLKEM768:X25519");
+    /* Solo grupos híbridos PQC (FIPS 203 ML-KEM-768): sin retroceso a X25519 puro */
+    if (SSL_CTX_set1_groups_list(ctx, "X25519MLKEM768:SecP256r1MLKEM768") != 1) {
+        SSL_CTX_free(ctx);
+        return NULL;
+    }
     return ctx;
 }
