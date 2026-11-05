@@ -79,24 +79,74 @@
                CT-CERO CT-AREA CT-CERO CT-AREA
                CT-CLAVE-LARGO CT-PUBLICA.
        FIRMAR-CIERRE.
+           *    FIRMA HIBRIDA: ED25519 + ML-DSA-65 (FIPS 204)
+      *    CT-REGLAS-EDDSA  = 'EDDSA   ' 'MESSAGE '
+      *    CT-REGLAS-MLDSA  = 'ML-DSA  ' 'MESSAGE '
+      *    (CT-CLAVE-ED = token Ed25519, CT-CLAVE-MLDSA = token ML-DSA-65)
            CALL 'CSNDDSG' USING CT-RC CT-RAZON CT-SALIDA-LARGO
-               CT-SALIDA CT-CUENTA-CUATRO CT-REGLAS-FIRMA
-               CT-CLAVE-LARGO CT-CLAVE CT-HASH-LARGO CT-HASH
-               CT-FIRMA-LARGO CT-FIRMA-BITS CT-FIRMA
+               CT-SALIDA CT-CUENTA-DOS CT-REGLAS-EDDSA
+               CT-CLAVE-ED-LARGO CT-CLAVE-ED CT-MSG-LARGO CT-MSG
+               CT-FIRMA-ED-LARGO CT-FIRMA-ED-BITS CT-FIRMA-ED
+           IF CT-RC NOT = ZERO
+               PERFORM ERROR-FIRMA
+           END-IF
            CALL 'CSNDDSG' USING CT-RC CT-RAZON CT-SALIDA-LARGO
-               CT-SALIDA CT-CUENTA-TRES CT-REGLAS-ECDSA
-               CT-CLAVE-LARGO CT-CLAVE CT-HASH-LARGO CT-HASH
-               CT-FIRMA-LARGO CT-FIRMA-BITS CT-FIRMA.
+               CT-SALIDA CT-CUENTA-DOS CT-REGLAS-MLDSA
+               CT-CLAVE-MLDSA-LARGO CT-CLAVE-MLDSA CT-MSG-LARGO CT-MSG
+               CT-FIRMA-PQ-LARGO CT-FIRMA-PQ-BITS CT-FIRMA-PQ
+           IF CT-RC NOT = ZERO
+               PERFORM ERROR-FIRMA
+           END-IF
+      *    FIRMA COMPUESTA = FIRMA-ED || FIRMA-PQ (AMBAS SE VERIFICAN)
+           STRING CT-FIRMA-ED DELIMITED BY SIZE
+                  CT-FIRMA-PQ DELIMITED BY SIZE
+                  INTO CT-FIRMA
+           END-STRING.
        CLAVE-SESION-BANCO.
+           *    Firma (sin cambios en este hallazgo)
            CALL 'CSNDPKE' USING CT-RC CT-RAZON CT-SALIDA-LARGO
                CT-SALIDA CT-CUENTA-UNA CT-REGLAS-PKE
                CT-HASH-LARGO CT-HASH CT-CERO CT-AREA
                CT-CLAVE-LARGO CT-PUBLICA CT-FIRMA-LARGO CT-FIRMA
+      *    Paso 1: componente clasico del hibrido (X25519 en ICSF)
+           MOVE 'X25519  ' TO CT-REGLAS-EDH-CURVA
            CALL 'CSNDEDH' USING CT-RC CT-RAZON CT-SALIDA-LARGO
-               CT-SALIDA CT-CUENTA-UNA CT-REGLAS-EDH
+               CT-SALIDA CT-CUENTA-DOS CT-REGLAS-EDH
                CT-CLAVE-LARGO CT-CLAVE CT-CERO CT-AREA
                CT-CLAVE-LARGO CT-PUBLICA CT-CERO CT-AREA
                CT-CERO CT-AREA CT-BITS-DERIVADOS CT-CERO CT-AREA
+           IF CT-RC NOT = ZERO
+               PERFORM 9000-ERROR-CRIPTO
+           END-IF
+           MOVE CT-SALIDA(1:32) TO CT-SECRETO-ECDH
+      *    Paso 2: componente post-cuantico ML-KEM-768 (FIPS 203)
+      *    QSMLKEM = stub que invoca Bouncy Castle 1.78 (BCPQC)
+      *    Entrada: clave publica ML-KEM-768 del par (1184 bytes)
+      *    Salida : ciphertext (1088 bytes) + secreto (32 bytes)
+           CALL 'QSMLKEM' USING CT-RC CT-RAZON
+               CT-MLKEM-REGLA
+               CT-MLKEM-PUB-LARGO CT-MLKEM-PUB
+               CT-MLKEM-CT-LARGO CT-MLKEM-CT
+               CT-MLKEM-SS-LARGO CT-SECRETO-MLKEM
+           IF CT-RC NOT = ZERO
+               PERFORM 9000-ERROR-CRIPTO
+           END-IF
+      *    Paso 3: combinar ambos secretos con KDF (HKDF-SHA-256)
+           MOVE CT-SECRETO-ECDH  TO CT-IKM(1:32)
+           MOVE CT-SECRETO-MLKEM TO CT-IKM(33:32)
+           MOVE 64 TO CT-IKM-LARGO
+           MOVE 'X25519-MLKEM768-HKDF-SHA256' TO CT-KDF-INFO
+           CALL 'QSHKDF' USING CT-RC CT-RAZON
+               CT-IKM-LARGO CT-IKM
+               CT-KDF-INFO-LARGO CT-KDF-INFO
+               CT-BITS-DERIVADOS CT-CLAVE-SESION
+           IF CT-RC NOT = ZERO
+               PERFORM 9000-ERROR-CRIPTO
+           END-IF
+      *    Enviar CT-MLKEM-CT junto con la clave publica X25519 al par
+      *    Borrar secretos intermedios de memoria
+           MOVE LOW-VALUES TO CT-SECRETO-ECDH
+                              CT-SECRETO-MLKEM CT-IKM
                CT-CERO CT-AREA CT-CERO CT-AREA CT-CERO CT-AREA
                CT-CERO CT-AREA CT-CERO CT-AREA CT-CLAVE-LARGO
                CT-CLAVE.
