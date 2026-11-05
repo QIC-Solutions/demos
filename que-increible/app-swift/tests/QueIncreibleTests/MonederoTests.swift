@@ -5,12 +5,13 @@ import XCTest
 final class MonederoTests: XCTestCase {
 
     func testDesDeJuguete() {
-        var salida = [UInt8](repeating: 0, count: 16)
-        var escritos = 0
-        let clave: [UInt8] = Array("8bytes!!".utf8)
-        let datos: [UInt8] = Array("12345678".utf8)
-        _ = CCCrypt(CCOperation(kCCEncrypt), CCAlgorithm(kCCAlgorithmDES), CCOptions(kCCOptionECBMode),
-                    clave, kCCKeySizeDES, nil, datos, datos.count, &salida, salida.count, &escritos)
-        XCTAssertEqual(escritos, 8)
+        // import CryptoKit (sustituye CommonCrypto); el método de test debe declararse `throws`
+        let clave = SymmetricKey(size: .bits256)          // 256 bits, generada de forma segura
+        let datos = Data("12345678".utf8)
+        let sellado = try AES.GCM.seal(datos, using: clave) // AES-256-GCM: cifrado autenticado
+        let abierto = try AES.GCM.open(sellado, using: clave)
+        XCTAssertEqual(sellado.ciphertext.count, 8)
+        XCTAssertEqual(sellado.tag.count, 16)
+        XCTAssertEqual(abierto, datos)
     }
 }
