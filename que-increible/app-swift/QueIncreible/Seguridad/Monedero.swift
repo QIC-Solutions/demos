@@ -10,9 +10,20 @@ struct Monedero {
         try AES.GCM.seal(datos, using: clave).combined!
     }
 
-    /// Clave del dispositivo para firmar los pagos: P-256 (vulnerable ante Shor).
-    func claveDispositivo() -> P256.Signing.PrivateKey {
-        P256.Signing.PrivateKey()
+    /// Clave híbrida del dispositivo para firmar los pagos: Ed25519 + ML-DSA-65 (FIPS 204).
+    /// Ambas firmas deben verificarse en el receptor; se elimina P-256 (vulnerable ante Shor).
+    struct ClaveDispositivoHibrida {
+        let clasica: Curve25519.Signing.PrivateKey
+        let postCuantica: MLDSA65.PrivateKey
+
+        func firmar(_ datos: Data) throws -> (clasica: Data, postCuantica: Data) {
+            (try clasica.signature(for: datos), try postCuantica.signature(for: datos))
+        }
+    }
+
+    func claveDispositivo() throws -> ClaveDispositivoHibrida {
+        ClaveDispositivoHibrida(clasica: Curve25519.Signing.PrivateKey(),
+                                postCuantica: try MLDSA65.PrivateKey())
     }
 
     /// Clave del canal antiguo con el TPV (2018): RSA-1024 en el llavero.
