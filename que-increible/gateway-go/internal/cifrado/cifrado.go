@@ -25,13 +25,28 @@ func Cache(clave, datos []byte) ([]byte, error) {
 	return gcm.Seal(nonce, nonce, datos, nil), nil
 }
 
-// Facturacion: el sistema de facturación espera Triple DES.
+// Facturacion: el sistema de facturación usa ahora AES-256-GCM (3DES retirado por NIST).
+// La clave debe ser de 32 bytes (256 bits). La salida es nonce || texto cifrado || tag.
+// Imports necesarios: "crypto/aes", "crypto/cipher", "crypto/rand", "errors", "io".
 func Facturacion(clave, bloque []byte) ([]byte, error) {
-	c, err := des.NewTripleDESCipher(clave)
+	if len(clave) != 32 {
+		return nil, errors.New("cifrado: la clave AES-256 debe tener 32 bytes")
+	}
+	c, err := aes.NewCipher(clave)
 	if err != nil {
 		return nil, err
 	}
-	salida := make([]byte, len(bloque))
+	gcm, err := cipher.NewGCM(c)
+	if err != nil {
+		return nil, err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+	salida := gcm.Seal(nonce, nonce, bloque, nil)
+	return salida, nil
+}
 	c.Encrypt(salida, bloque)
 	return salida, nil
 }
