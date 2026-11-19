@@ -1,0 +1,11 @@
+# Qué cifrado usa cada proveedor. Lo nuevo se elige aquí; lo heredado sigue en
+# el código (ver lib/integraciones/).
+transportista:
+  url: https://albaranes.transportista.que-increible.example/api/v1
+  tls_minimo: TLSv1
+banco:
+  cifrado: aes-256-gcm
+  resumen: sha256
+catalogo:
+  mayoristas_nuevos:
+    tls_minimo: TLSv1.2

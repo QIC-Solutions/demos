@@ -42,6 +42,8 @@ escanea como una fuente de tipo REPOSITORY independiente (campo `subcarpeta`).
 | [`core-cobol`](que-increible/core-cobol) | COBOL (z/OS) | Núcleo contable en mainframe, con ICSF |
 | [`sap-abap`](que-increible/sap-abap) | ABAP | Extensiones de SAP (FI, remesas SEPA, HCM) |
 | [`infra`](que-increible/infra) | shell, Dockerfile, Makefile, configuración | nginx, sshd, certificados y despliegue |
+| [`integraciones-ruby`](que-increible/integraciones-ruby) | Ruby | Ficheros con transportistas, el banco y los mayoristas del catálogo |
+| [`widget-js`](que-increible/widget-js) | JavaScript (Node y navegador) | Widget de pago que incrustan las tiendas asociadas |
 
 En cada aplicación hay, mezclado como en la vida real:
 

@@ -1,0 +1,14 @@
+{
+  "name": "@que-increible/widget-js",
+  "version": "3.4.1",
+  "private": true,
+  "description": "Widget de pago de Que Increible Compañia (ficticio, de demo)",
+  "type": "commonjs",
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "crypto-js": "4.2.0"
+  },
+  "devDependencies": {
+    "jest": "29.7.0"
+  }
+}
